@@ -291,16 +291,40 @@ Automatically stops processing after consecutive failures to prevent cascade fai
 
 ## 💡 Real-World Examples
 
-### Analyze 1000+ Files in a Codebase
+### 📚 Summarize a 500-Page Research Paper
 
 ```typescript
-const files = globSync('src/**/*.ts');  // 1000+ files
+const paper = readFileSync('quantum-computing-thesis.pdf', 'utf-8');
+// 200,000+ characters - would fail with direct LLM call
+
+const summary = await fractop()
+  .withLLM({
+    model: 'groq:llama-3.1-70b',
+    credentials: { groqApiKey: process.env.GROQ_API_KEY },
+    messages: (chunk) => [
+      { role: 'system', content: 'Summarize key findings. Be concise.' },
+      { role: 'user', content: chunk }
+    ]
+  })
+  .chunking({ size: 3000, overlap: 300 })
+  .parallel(5)  // Process 5 chunks simultaneously
+  .run(paper);
+
+// Merge summaries into final document
+const finalSummary = summary.join('\n\n');
+```
+
+### 🔍 Analyze 1000+ Files in a Codebase
+
+```typescript
+const files = globSync('src/**/*.ts');  // 1000+ TypeScript files
 const fullCode = files.map(f => readFileSync(f)).join('\n');
+// Millions of characters - impossible with single LLM call
 
 // Extract all API endpoints
 const endpoints = await fractop()
   .withLLM({
-    model: 'claude:claude-3-5-haiku',
+    model: 'anthropic:claude-3-5-haiku',
     credentials: { anthropicApiKey: API_KEY },
     messages: (chunk) => [
       { role: 'system', content: 'Extract REST API endpoints as JSON.' },
@@ -308,41 +332,115 @@ const endpoints = await fractop()
     ],
     transform: (res) => JSON.parse(res.text)
   })
-  .chunking({ size: 4000, overlap: 500 })
+  .chunking({ size: 4000, overlap: 500 })  // Overlap prevents missing endpoints
   .parallel(10)  // Analyze 10 files simultaneously
   .run(fullCode);
+
+// Deduplicate results
+const uniqueEndpoints = [...new Set(endpoints.flat())];
+console.log(`Found ${uniqueEndpoints.length} API endpoints`);
 ```
 
-### Process Customer Support Tickets
+### 🌐 Translate an Entire Book
+
+```typescript
+const book = await fetch('https://gutenberg.org/files/2600/2600-0.txt')
+  .then(r => r.text());  // War and Peace - 3.2 million characters!
+
+const translatedBook = await fractop()
+  .withLLM({
+    model: 'gemini:gemini-2.5-pro',
+    credentials: { geminiApiKey: process.env.GEMINI_API_KEY },
+    messages: (chunk) => [
+      { role: 'system', content: 'Translate to Japanese. Keep literary style.' },
+      { role: 'user', content: chunk }
+    ]
+  })
+  .chunking({ 
+    size: 2000,      // Smaller chunks for quality
+    overlap: 200     // Preserve sentence flow
+  })
+  .retry(3, 2000)    // Retry failed chunks
+  .timeout(120000)   // 2 min timeout per chunk
+  .run(book);
+
+writeFileSync('war-and-peace-ja.txt', translatedBook.join(''));
+```
+
+### 📊 Process 50,000 Customer Reviews
 
 ```typescript
 // 50,000 support tickets from database
-const tickets = await db.query('SELECT * FROM tickets');
-const ticketTexts = tickets.map(t => t.description);
+const tickets = await db.query('SELECT * FROM tickets LIMIT 50000');
+const ticketTexts = tickets.map(t => t.content);
 
-// Categorize and extract action items
-const processed = await fractopBatch(ticketTexts)
+// Process in batches with streaming
+const analysis = await fractopBatch(ticketTexts)
   .withLLM({
-    model: 'groq:llama-3.1-70b',
+    model: 'groq:llama-3.1-8b-instant',  // Fast model for high volume
     credentials: { groqApiKey: API_KEY },
     messages: (ticket) => [
-      { role: 'system', content: 'Categorize: bug/feature/question. Extract action items.' },
+      { role: 'system', content: 'Output: sentiment|category|priority' },
       { role: 'user', content: ticket }
-    ]
+    ],
+    transform: (res) => {
+      const [sentiment, category, priority] = res.text.split('|');
+      return { sentiment, category, priority };
+    }
   })
   .collectAll();
 
-// Results: Map<ticket, { category, actionItems }>
+// Aggregate insights
+const insights = {
+  sentiments: { positive: 0, negative: 0, neutral: 0 },
+  categories: new Map(),
+  highPriority: []
+};
+
+for (const [ticket, results] of analysis) {
+  results.forEach(r => {
+    insights.sentiments[r.sentiment]++;
+    if (r.priority === 'high') insights.highPriority.push(ticket);
+  });
+}
 ```
 
-### Real-time Document Q&A
+### 🤖 Generate Tests for Large Components
+
+```typescript
+const component = readFileSync('src/Dashboard.tsx', 'utf-8');
+// 5000-line React component
+
+const tests = await fractop()
+  .withLLM({
+    model: 'openai:gpt-4o',
+    credentials: { openaiApiKey: process.env.OPENAI_API_KEY },
+    messages: (chunk) => [
+      { role: 'system', content: 'Generate Jest unit tests with React Testing Library.' },
+      { role: 'user', content: chunk }
+    ]
+  })
+  .chunking({ size: 1500 })  // Each chunk gets targeted tests
+  .parallel(3)
+  .run(component);
+
+// Combine into test suite
+const testFile = `
+describe('Dashboard Component', () => {
+  ${tests.join('\n\n')}
+});
+`;
+writeFileSync('Dashboard.test.tsx', testFile);
+```
+
+### 💬 Real-time Document Q&A
 
 ```typescript
 async function askDocument(doc: string, question: string) {
   // Stream through document to find answers
   return await fractopStream(doc)
     .withLLM({
-      model: 'gemini:gemini-2.5-pro',
+      model: 'gemini:gemini-2.5-flash',  // Fast for real-time
       credentials: { geminiApiKey: API_KEY },
       messages: (chunk) => [
         { role: 'user', content: `Answer "${question}" from: ${chunk}` }
@@ -355,8 +453,10 @@ async function askDocument(doc: string, question: string) {
     .collect();
 }
 
-const manual = readFileSync('kubernetes-manual.pdf', 'utf-8');
+// Usage
+const manual = readFileSync('kubernetes-manual.txt', 'utf-8');
 const answers = await askDocument(manual, "How to set up auto-scaling?");
+// Returns in seconds, not minutes!
 ```
 
 ## 🎯 Common Use Cases
