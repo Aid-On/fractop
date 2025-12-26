@@ -1,0 +1,47 @@
+{
+  "name": "@aid-on/fractop",
+  "version": "0.1.0",
+  "description": "FractoP - Fractal Processor for infinite-length text processing with LLMs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aid-On/fractop.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Aid-On/fractop/issues"
+  },
+  "homepage": "https://github.com/Aid-On/fractop#readme",
+  "author": "Aid-On Team",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "keywords": [
+    "llm",
+    "fractal",
+    "chunking",
+    "long-context",
+    "text-processing",
+    "ai",
+    "medical-grade",
+    "reliability"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@aid-on/nagare": "^0.1.0"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^1.6.1",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  }
+}
