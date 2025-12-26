@@ -8,6 +8,19 @@ import { FractalProcessor } from './core';
 import type { FractalConfig, LLMProvider, MergeResult, ProcessOptions } from './types';
 import { createLLMAdapter } from './llm-adapter';
 import { simpleMerge, weightedMerge } from './core';
+import type { ModelSpec, Credentials } from '@aid-on/unillm';
+import { generate } from '@aid-on/unillm';
+
+/**
+ * UnillM processor configuration
+ */
+interface UnillMProcessor<T = string> {
+  model: ModelSpec | string;
+  messages?: (chunk: string) => Array<{ role: string; content: string }>;
+  credentials: Credentials;
+  options?: { temperature?: number; maxTokens?: number };
+  transform?: (response: { text: string }) => T;
+}
 
 /**
  * Fluent builder for creating FractoP pipelines
@@ -34,25 +47,45 @@ export class FractoPBuilder<T = string> {
   private resultMerger?: (results: T[][]) => MergeResult<T>;
 
   /**
-   * Set the LLM provider or processing function
-   */
-  withLLM(provider: LLMProvider | ((text: string) => Promise<T>)): this {
-    this.llmProvider = provider;
-    return this;
-  }
-
-  /**
-   * Set the UnillM processor
+   * Set the LLM provider, processing function, or UnillM configuration
+   * 
    * @example
    * ```typescript
-   * .withUnillM(async (chunk) => {
-   *   const result = await generate('groq:llama-3.1-8b', messages, options);
-   *   return result.text;
+   * // Function processor
+   * .withLLM(async (chunk) => await myLLM.process(chunk))
+   * 
+   * // UnillM configuration
+   * .withLLM({
+   *   model: 'groq:llama-3.1-70b',
+   *   credentials: { groqApiKey: process.env.GROQ_API_KEY },
+   *   messages: (chunk) => [
+   *     { role: 'system', content: 'Summarize this text.' },
+   *     { role: 'user', content: chunk }
+   *   ]
    * })
    * ```
    */
-  withUnillM(processor: (chunk: string) => Promise<T>): this {
-    this.llmProvider = processor;
+  withLLM(provider: LLMProvider | ((text: string) => Promise<T>) | UnillMProcessor<T>): this {
+    // Check if it's a UnillM processor configuration
+    if (provider && typeof provider === 'object' && 'model' in provider) {
+      const unillmConfig = provider as UnillMProcessor<T>;
+      this.llmProvider = async (chunk: string) => {
+        const messages = unillmConfig.messages 
+          ? unillmConfig.messages(chunk)
+          : [{ role: 'user', content: chunk }];
+        
+        const result = await generate(
+          unillmConfig.model,
+          messages,
+          unillmConfig.credentials,
+          unillmConfig.options || {}
+        );
+        
+        return unillmConfig.transform ? unillmConfig.transform(result) : result.text as any as T;
+      };
+    } else {
+      this.llmProvider = provider as LLMProvider | ((text: string) => Promise<T>);
+    }
     return this;
   }
 

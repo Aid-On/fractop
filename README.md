@@ -77,23 +77,33 @@ const summaries = await fractop()
 ### With UnillM
 
 ```typescript
-import { generate } from '@aid-on/unillm';
-
+// UnillM configuration object
 const results = await fractop()
-  .withUnillM(async (chunk) => {
-    const result = await generate(
-      'groq:llama-3.1-70b',
-      [
-        { role: 'system', content: 'Extract key points.' },
-        { role: 'user', content: chunk }
-      ],
-      { groqApiKey: process.env.GROQ_API_KEY }
-    );
-    return result.text;
+  .withLLM({
+    model: 'groq:llama-3.1-70b',
+    credentials: { groqApiKey: process.env.GROQ_API_KEY },
+    messages: (chunk) => [
+      { role: 'system', content: 'Extract key points.' },
+      { role: 'user', content: chunk }
+    ],
+    options: { temperature: 0.7 }
   })
   .chunking({ size: 3000 })
   .parallel(3)
   .run(text);
+
+// Or with custom transform
+const entities = await fractop<Entity[]>()
+  .withLLM({
+    model: 'anthropic:claude-3-5-haiku',
+    credentials: { anthropicApiKey: process.env.ANTHROPIC_API_KEY },
+    messages: (chunk) => [
+      { role: 'system', content: 'Extract entities as JSON.' },
+      { role: 'user', content: chunk }
+    ],
+    transform: (response) => JSON.parse(response.text)
+  })
+  .run(document);
 ```
 
 ## 🌊 Streaming with Nagare
@@ -340,8 +350,7 @@ import { simpleMerge, weightedMerge } from '@aid-on/fractop';
 
 | Method | Description |
 |--------|-------------|
-| `.withLLM(fn)` | Set LLM processor function |
-| `.withUnillM(fn)` | Set UnillM processor |
+| `.withLLM(fn\|config)` | Set LLM processor (function or UnillM config) |
 | `.chunking(opts)` | Configure chunk size and overlap |
 | `.parallel(n)` | Enable parallel processing |
 | `.retry(n, delay)` | Configure retry behavior |
