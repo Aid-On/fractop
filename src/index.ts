@@ -41,3 +41,7 @@ export {
   TimeoutError,
   CircuitBreakerError,
 } from './core';
+
+// UnillM integration helpers
+export { createWithUnillM, createUnillMProcessor } from './with-unillm';
+export { createLLMAdapter, createUnillMAdapter } from './llm-adapter';

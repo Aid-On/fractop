@@ -28,11 +28,11 @@ describe('Complete Branch Coverage', () => {
 
     // Test 3: Text with paragraph break in search window
     chunks = (processor as any).splitIntoChunks('a'.repeat(15) + '\n\n' + 'b'.repeat(20));
-    expect(chunks[0]).toEndWith('\n\n');
+    expect(chunks[0]).toMatch(/\n\n$/);
 
     // Test 4: Text with sentence break but no paragraph
     chunks = (processor as any).splitIntoChunks('a'.repeat(18) + '。 ' + 'b'.repeat(20));
-    expect(chunks[0]).toEndWith('。 ');
+    expect(chunks[0]).toMatch(/。 $/);
 
     // Test 5: Text with only delimiter
     chunks = (processor as any).splitIntoChunks('a'.repeat(19) + ', ' + 'b'.repeat(20));

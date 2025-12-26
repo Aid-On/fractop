@@ -1,6 +1,7 @@
 {
   "name": "@aid-on/fractop",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "type": "module",
   "description": "FractoP - Fractal Processor for infinite-length text processing with LLMs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -37,7 +38,8 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@aid-on/nagare": "^0.1.0"
+    "@aid-on/nagare": "^0.1.0",
+    "@aid-on/unillm": "file:../unillm"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^1.6.1",

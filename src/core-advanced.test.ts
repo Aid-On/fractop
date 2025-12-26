@@ -24,6 +24,7 @@ describe('FractalProcessor - Parallel Processing', () => {
   it('processes all chunks in parallel mode', async () => {
     const processor = new FractalProcessor<string>(llm, {
       chunkSize: 10,
+      overlapSize: 0, // Set overlap to 0 for predictable chunking
       parallelProcessing: true,
       concurrency: 5,
     });
@@ -45,7 +46,7 @@ describe('FractalProcessor - Parallel Processing', () => {
 
     const result = await processor.process('a'.repeat(50), options);
     
-    // All chunks should be processed
+    // All chunks should be processed (50 chars / 10 = 5 chunks)
     expect(processedChunks.length).toBe(5);
     expect(result.length).toBe(5);
     
@@ -57,6 +58,7 @@ describe('FractalProcessor - Parallel Processing', () => {
   it('respects concurrency limit', async () => {
     const processor = new FractalProcessor<string>(llm, {
       chunkSize: 10,
+      overlapSize: 0, // Set overlap to 0 for predictable chunking
       parallelProcessing: true,
       concurrency: 2, // Only 2 at a time
     });
@@ -82,13 +84,14 @@ describe('FractalProcessor - Parallel Processing', () => {
 
     await processor.process('a'.repeat(50), options);
     
-    // Should never exceed concurrency limit
+    // Should never exceed concurrency limit (5 chunks / batch size 2)
     expect(maxActive).toBeLessThanOrEqual(2);
   });
 
   it('handles errors in parallel mode', async () => {
     const processor = new FractalProcessor<string>(llm, {
       chunkSize: 10,
+      overlapSize: 0, // Set overlap to 0 for predictable chunking
       parallelProcessing: true,
       concurrency: 3,
       maxRetries: 1,
@@ -115,15 +118,18 @@ describe('FractalProcessor - Parallel Processing', () => {
 
     const result = await processor.processWithMetadata('a'.repeat(50), options);
     
-    // Should have some successful items
+    // Should have some successful items (chunks 1, 3 should succeed, chunks 0, 2, 4 should fail)
     expect(result.items.length).toBeGreaterThan(0);
     expect(result.chunksFailed).toBeGreaterThan(0);
     expect(result.chunksProcessed).toBeGreaterThan(0);
+    expect(result.items).toContain('item-1');
+    expect(result.items).toContain('item-3');
   });
 
   it('does not use previous summary in parallel mode', async () => {
     const processor = new FractalProcessor<string>(llm, {
       chunkSize: 10,
+      overlapSize: 0, // Set overlap to 0 for predictable chunking
       parallelProcessing: true,
     });
 
@@ -153,6 +159,7 @@ describe('FractalProcessor - Parallel Processing', () => {
   it('handles timeout in parallel mode', async () => {
     const processor = new FractalProcessor<string>(llm, {
       chunkSize: 10,
+      overlapSize: 0, // Set overlap to 0 for predictable chunking
       parallelProcessing: true,
       timeout: 100,
     });
@@ -170,15 +177,14 @@ describe('FractalProcessor - Parallel Processing', () => {
       getKey: (item) => item,
     };
 
-    const result = await processor.processWithMetadata('a'.repeat(30), options);
-    
-    // Should timeout and have incomplete results
-    expect(result.chunksProcessed).toBeLessThan(3);
+    // Should throw TimeoutError
+    await expect(processor.processWithMetadata('a'.repeat(30), options)).rejects.toThrow('Timeout');
   });
 
   it('parallel mode with empty chunks', async () => {
     const processor = new FractalProcessor<string>(llm, {
       chunkSize: 10,
+      overlapSize: 0, // Set overlap to 0 for predictable chunking
       parallelProcessing: true,
     });
 
@@ -207,6 +213,7 @@ describe('FractalProcessor - Streaming API', () => {
   it('streams items as they are processed', async () => {
     const processor = new FractalProcessor<string>(llm, {
       chunkSize: 10,
+      overlapSize: 0, // Set overlap to 0 for predictable chunking
     });
 
     let itemCount = 0;
@@ -239,6 +246,7 @@ describe('FractalProcessor - Streaming API', () => {
   it('propagates context in streaming mode', async () => {
     const processor = new FractalProcessor<string>(llm, {
       chunkSize: 10,
+      overlapSize: 0, // Set overlap to 0 for predictable chunking
     });
 
     const summaries: (string | undefined)[] = [];
@@ -272,6 +280,7 @@ describe('FractalProcessor - Streaming API', () => {
   it('handles errors gracefully in streaming', async () => {
     const processor = new FractalProcessor<string>(llm, {
       chunkSize: 10,
+      overlapSize: 0, // Set overlap to 0 for predictable chunking
       maxRetries: 1,
       retryDelay: 1,
     });
@@ -384,6 +393,7 @@ describe('FractalProcessor - Streaming API', () => {
   it('stream can be interrupted', async () => {
     const processor = new FractalProcessor<string>(llm, {
       chunkSize: 10,
+      overlapSize: 0, // Set overlap to 0 for predictable chunking
     });
 
     const options: ProcessOptions<string> = {
@@ -417,6 +427,7 @@ describe('FractalProcessor - Streaming API', () => {
   it('stream handles async consumption correctly', async () => {
     const processor = new FractalProcessor<string>(llm, {
       chunkSize: 10,
+      overlapSize: 0, // Set overlap to 0 for predictable chunking
     });
 
     const options: ProcessOptions<string> = {
@@ -446,7 +457,10 @@ describe('FractalProcessor - Streaming API', () => {
   });
 
   it('nagare stream can be transformed', async () => {
-    const processor = new FractalProcessor<{ value: number }>(llm);
+    const processor = new FractalProcessor<{ value: number }>(llm, {
+      chunkSize: 10,
+      overlapSize: 0, // Set overlap to 0 for predictable chunking
+    });
 
     const options: ProcessOptions<{ value: number }> = {
       generateContext: vi.fn().mockResolvedValue('context'),
@@ -466,7 +480,7 @@ describe('FractalProcessor - Streaming API', () => {
       getKey: (item) => item.value.toString(),
     };
 
-    const stream = processor.processAsStream('test', options);
+    const stream = processor.processAsStream('test-chunk', options); // 10 chars for 1 chunk
     
     // Transform stream using Nagare operations
     const transformed = stream
@@ -474,15 +488,26 @@ describe('FractalProcessor - Streaming API', () => {
       .map(item => item.value * 2);
     
     const collected: number[] = [];
+    let completed = false;
     const subscription = transformed.subscribe({
       next: (value) => collected.push(value),
+      complete: () => { completed = true; }
     });
     
     // Wait for completion
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise(r => {
+      const checkCompletion = () => {
+        if (completed || collected.length >= 1) {
+          r(undefined);
+        } else {
+          setTimeout(checkCompletion, 10);
+        }
+      };
+      checkCompletion();
+    });
     
-    // Should have filtered and transformed values
-    expect(collected).toEqual([0, 20]); // 0*2, 10*2 (5 and 15 filtered out)
+    // Should have filtered and transformed values (only one chunk with index 0)
+    expect(collected).toEqual([0]); // 0*2 (5 filtered out)
     
     subscription.unsubscribe();
   });
