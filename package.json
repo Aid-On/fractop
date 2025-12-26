@@ -39,7 +39,7 @@
   "license": "MIT",
   "dependencies": {
     "@aid-on/nagare": "^0.1.0",
-    "@aid-on/unillm": "file:../unillm"
+    "@aid-on/unillm": "^0.4.0"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^1.6.1",
