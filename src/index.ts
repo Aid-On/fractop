@@ -32,6 +32,17 @@ export type {
   FractalResult,
 } from './types';
 
+// Primary interfaces - Fluent API and Stream Integration
+export { fractop, FractoPBuilder } from './fluent';
+export { 
+  fractopStream, 
+  fractopBatch, 
+  createPipeline,
+  FractoPStream,
+  FractoPBatch,
+  FractoPPipeline 
+} from './nagare-integration';
+
 // Core
 export {
   FractalProcessor,
@@ -42,6 +53,6 @@ export {
   CircuitBreakerError,
 } from './core';
 
-// UnillM integration helpers
+// Helper functions (secondary)
 export { createWithUnillM, createUnillMProcessor } from './with-unillm';
 export { createLLMAdapter, createUnillMAdapter } from './llm-adapter';

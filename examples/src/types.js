@@ -1,0 +1,4 @@
+/**
+ * FractoP - Type Definitions
+ */
+export {};
