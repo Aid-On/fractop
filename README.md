@@ -8,6 +8,35 @@
 
 FractoP (Fractal Processor) - Elegant text processing for LLMs with streaming, batching, and fractal chunking.
 
+## 🚨 The Problem
+
+**LLMs have context limits.** GPT-4 caps at 128K tokens. Claude at 200K. Even Gemini's 2M context fills up fast.
+
+What happens when you need to:
+- Summarize a 500-page PDF?
+- Analyze a codebase with 10,000 files?
+- Translate an entire book?
+- Process millions of customer reviews?
+
+```typescript
+// ❌ This fails
+const summary = await llm.process(entire500PagePDF);
+// Error: Context length exceeded (400,000 tokens > 128,000 limit)
+```
+
+## ✅ The Solution: FractoP
+
+FractoP intelligently chunks your text, processes each piece, and merges results - all while preserving context.
+
+```typescript
+// ✅ This works for ANY size document
+const summary = await fractop()
+  .withLLM(llm)
+  .chunking({ size: 3000, overlap: 300 })
+  .parallel(5)
+  .run(entire500PagePDF);
+```
+
 ## ✨ Features
 
 - **🎯 Fluent API**: Elegant chainable interface for building processing pipelines
@@ -259,6 +288,76 @@ fractop()
 
 ### Circuit Breaker
 Automatically stops processing after consecutive failures to prevent cascade failures.
+
+## 💡 Real-World Examples
+
+### Analyze 1000+ Files in a Codebase
+
+```typescript
+const files = globSync('src/**/*.ts');  // 1000+ files
+const fullCode = files.map(f => readFileSync(f)).join('\n');
+
+// Extract all API endpoints
+const endpoints = await fractop()
+  .withLLM({
+    model: 'claude:claude-3-5-haiku',
+    credentials: { anthropicApiKey: API_KEY },
+    messages: (chunk) => [
+      { role: 'system', content: 'Extract REST API endpoints as JSON.' },
+      { role: 'user', content: chunk }
+    ],
+    transform: (res) => JSON.parse(res.text)
+  })
+  .chunking({ size: 4000, overlap: 500 })
+  .parallel(10)  // Analyze 10 files simultaneously
+  .run(fullCode);
+```
+
+### Process Customer Support Tickets
+
+```typescript
+// 50,000 support tickets from database
+const tickets = await db.query('SELECT * FROM tickets');
+const ticketTexts = tickets.map(t => t.description);
+
+// Categorize and extract action items
+const processed = await fractopBatch(ticketTexts)
+  .withLLM({
+    model: 'groq:llama-3.1-70b',
+    credentials: { groqApiKey: API_KEY },
+    messages: (ticket) => [
+      { role: 'system', content: 'Categorize: bug/feature/question. Extract action items.' },
+      { role: 'user', content: ticket }
+    ]
+  })
+  .collectAll();
+
+// Results: Map<ticket, { category, actionItems }>
+```
+
+### Real-time Document Q&A
+
+```typescript
+async function askDocument(doc: string, question: string) {
+  // Stream through document to find answers
+  return await fractopStream(doc)
+    .withLLM({
+      model: 'gemini:gemini-2.5-pro',
+      credentials: { geminiApiKey: API_KEY },
+      messages: (chunk) => [
+        { role: 'user', content: `Answer "${question}" from: ${chunk}` }
+      ]
+    })
+    .chunking({ size: 3000, overlap: 500 })
+    .stream()
+    .filter(answer => answer.length > 20)  // Filter relevant answers
+    .take(3)  // First 3 good answers
+    .collect();
+}
+
+const manual = readFileSync('kubernetes-manual.pdf', 'utf-8');
+const answers = await askDocument(manual, "How to set up auto-scaling?");
+```
 
 ## 🎯 Common Use Cases
 
