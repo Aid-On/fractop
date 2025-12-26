@@ -10,10 +10,12 @@ FractoP (Fractal Processor) - A library for processing infinite-length text with
 
 ## Features
 
+- **UnillM Integration**: Seamless integration with @aid-on/unillm for unified LLM access
 - **Infinite Length Support**: Process documents of any size through intelligent chunking
 - **Context Propagation**: Maintains global context and inter-chunk summaries throughout processing
-- **Smart Chunking**: Splits at paragraph/sentence boundaries with configurable overlap (safer 6000 char default)
-- **Parallel Processing**: Optional parallel chunk processing for better performance (without context propagation)
+- **Smart Chunking**: Splits at paragraph/sentence boundaries with configurable overlap (safer 3000 char default for LLMs)
+- **Type-Safe Adapters**: Convert any async function to LLMProvider without using `any` types
+- **Parallel Processing**: Optional parallel chunk processing for better performance
 - **Streaming API**: Memory-efficient processing with Nagare Stream<T> integration
 - **Automatic Deduplication**: Removes duplicate extracted items automatically
 - **Supplement Processing**: Automatically extracts additional items when results are insufficient
@@ -27,20 +29,46 @@ npm install @aid-on/fractop
 
 ## Quick Start
 
+### With UnillM (Recommended)
+
 ```typescript
-import { FractalProcessor, simpleMerge, type LLMProvider } from '@aid-on/fractop';
+import { createWithUnillM } from '@aid-on/fractop';
+import { generate } from '@aid-on/unillm';
+
+// Create a processor with UnillM integration
+const processor = createWithUnillM(
+  async (chunk) => {
+    const result = await generate(
+      'groq:llama-3.1-8b-instant',
+      [
+        { role: 'system', content: 'Summarize this text concisely.' },
+        { role: 'user', content: chunk }
+      ],
+      { groqApiKey: process.env.GROQ_API_KEY }
+    );
+    return result.text;
+  },
+  { chunkSize: 3000, overlapSize: 300 }
+);
+
+// Process long text
+const summary = await processor.process(longText);
+```
+
+### With Custom LLM Provider
+
+```typescript
+import { FractalProcessor, createLLMAdapter, simpleMerge } from '@aid-on/fractop';
 import type { Stream } from '@aid-on/nagare';
 
-// Implement the LLMProvider interface
-const llm: LLMProvider = {
-  async chat(systemPrompt, userPrompt, options) {
-    // Your LLM implementation here
-    return await yourLLM.complete({ systemPrompt, userPrompt, ...options });
-  }
-};
+// Create an adapter for your LLM
+const llmAdapter = createLLMAdapter(async (text) => {
+  // Your LLM implementation here
+  return await yourLLM.complete(text);
+});
 
 // Create a processor
-const processor = new FractalProcessor<{ keyword: string; weight: number }>(llm, {
+const processor = new FractalProcessor<{ keyword: string; weight: number }>(llmAdapter, {
   chunkSize: 6000,       // Characters per chunk (safer default for token limits)
   overlapSize: 500,      // Overlap between chunks
   minResultCount: 30,    // Minimum results threshold
@@ -101,6 +129,47 @@ Merge & Deduplicate Results
 Supplement if Needed
     ↓
 Final Results
+```
+
+## API Reference
+
+### UnillM Integration Helpers
+
+#### createWithUnillM(processor, config)
+Creates a FractalProcessor optimized for UnillM usage.
+
+```typescript
+const processor = createWithUnillM(
+  async (chunk: string) => {
+    // Process with UnillM
+    const result = await generate(model, messages, options);
+    return result.text;
+  },
+  { chunkSize: 3000 } // Optimized defaults for LLMs
+);
+```
+
+#### createLLMAdapter(asyncFn)
+Converts any async function to an LLMProvider interface.
+
+```typescript
+const adapter = createLLMAdapter(async (text) => {
+  return await myLLM.process(text);
+});
+```
+
+#### createUnillMProcessor(config)
+Creates an advanced processor with metadata support.
+
+```typescript
+const processor = createUnillMProcessor({
+  processChunk: async (chunk, context) => {
+    // Process with context
+    return processedResult;
+  },
+  generateContext: async (text) => ({ summary: '...' }),
+  mergeResults: (results) => ({ items: results.flat(), needsSupplement: false })
+});
 ```
 
 ## Configuration
