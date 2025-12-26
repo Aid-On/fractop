@@ -6,18 +6,47 @@
 
 日本語 | [English](./README.md)
 
-FractoP (Fractal Processor) - LLMを使用したフラクタルアーキテクチャによる無限長テキスト処理ライブラリ。
+FractoP (Fractal Processor) - ストリーミング、バッチ処理、フラクタルチャンキングを備えたLLM向けのエレガントなテキスト処理。
 
-## 特徴
+## 🚨 問題
 
-- **無限長対応**: インテリジェントなチャンク分割により任意サイズの文書を処理
-- **コンテキスト伝播**: 処理全体を通じてグローバルコンテキストとチャンク間サマリーを維持
-- **スマートチャンキング**: 段落/文境界で分割、設定可能なオーバーラップ（より安全な6000文字デフォルト）
-- **並列処理**: パフォーマンス向上のためのオプション並列チャンク処理（コンテキスト伝播なし）
-- **ストリーミングAPI**: Nagare Stream<T>統合によるメモリ効率的な処理
-- **自動重複排除**: 抽出アイテムの自動重複排除
-- **補足処理**: 結果が不足時に自動で追加抽出
-- **エンタープライズグレードの信頼性**: タイムアウト、指数バックオフ付きリトライ、サーキットブレーカーパターン内蔵
+**LLMにはコンテキスト制限があります。** GPT-4は128Kトークンが上限。Claudeは200K。Geminiの2Mコンテキストでもすぐに埋まります。
+
+次のような場合どうしますか？
+- 500ページのPDFを要約したい？
+- 10,000ファイルのコードベースを解析したい？
+- 本を丸ごと翻訳したい？
+- 数百万件のカスタマーレビューを処理したい？
+
+```typescript
+// ❌ これは失敗します
+const summary = await llm.process(entire500PagePDF);
+// Error: Context length exceeded (400,000 tokens > 128,000 limit)
+```
+
+## ✅ 解決策：FractoP
+
+FractoPは賢くテキストをチャンク分割し、各部分を処理し、結果をマージします - すべてコンテキストを保持しながら。
+
+```typescript
+// ✅ どんなサイズのドキュメントでも動作
+const summary = await fractop()
+  .withLLM(llm)
+  .chunking({ size: 3000, overlap: 300 })
+  .parallel(5)
+  .run(entire500PagePDF);
+```
+
+## ✨ 特徴
+
+- **🎯 Fluent API**: エレガントなチェーン可能インターフェース
+- **🌊 Nagareストリーミング**: `Stream<T>`統合によるリアクティブストリーム処理
+- **🔄 スマートチャンキング**: コンテキスト保持のためのオーバーラップ付き賢い分割
+- **⚡ 並列処理**: 最大パフォーマンスのための並行チャンク処理
+- **🛡️ エンタープライズ信頼性**: タイムアウト、リトライ、サーキットブレーカー内蔵
+- **🎨 UnillM統合**: UnillMアダプター経由で任意のLLMとシームレスに動作
+- **📦 バッチ処理**: 複数ドキュメントを効率的に処理
+- **🔁 自動リトライ**: 一時的な障害に対する指数バックオフ
 
 ## インストール
 
@@ -25,283 +54,314 @@ FractoP (Fractal Processor) - LLMを使用したフラクタルアーキテク�
 npm install @aid-on/fractop
 ```
 
-## クイックスタート
+## 🚀 クイックスタート
+
+### 主要インターフェース - Fluent API
+
+FractoPを使う最もエレガントな方法：
 
 ```typescript
-import { FractalProcessor, simpleMerge, type LLMProvider } from '@aid-on/fractop';
-import type { Stream } from '@aid-on/nagare';
+import { fractop } from '@aid-on/fractop';
 
-// LLMProviderインターフェースを実装
-const llm: LLMProvider = {
-  async chat(systemPrompt, userPrompt, options) {
-    // あなたのLLM実装をここに
-    return await yourLLM.complete({ systemPrompt, userPrompt, ...options });
-  }
+// シンプルでエレガント
+const results = await fractop()
+  .withLLM(async (chunk) => {
+    // あなたのLLMロジック
+    const response = await callYourLLM(chunk);
+    return response;
+  })
+  .chunking({ size: 3000, overlap: 300 })
+  .parallel(5)
+  .retry(3, 1000)
+  .timeout(30000)
+  .run(longText);
+```
+
+### GROQ/OpenAIと使用
+
+```typescript
+const summaries = await fractop()
+  .withLLM(async (chunk) => {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: '簡潔に要約してください。' },
+          { role: 'user', content: chunk }
+        ]
+      })
+    });
+    const data = await response.json();
+    return data.choices[0].message.content;
+  })
+  .chunking({ size: 2000, overlap: 200 })
+  .run(document);
+```
+
+### UnillMと使用
+
+```typescript
+// UnillM設定オブジェクト
+const results = await fractop()
+  .withLLM({
+    model: 'groq:llama-3.1-70b',
+    credentials: { groqApiKey: process.env.GROQ_API_KEY },
+    messages: (chunk) => [
+      { role: 'system', content: 'キーポイントを抽出してください。' },
+      { role: 'user', content: chunk }
+    ],
+    options: { temperature: 0.7 }
+  })
+  .chunking({ size: 3000 })
+  .parallel(3)
+  .run(text);
+
+// カスタム変換も可能
+const entities = await fractop<Entity[]>()
+  .withLLM({
+    model: 'anthropic:claude-3-5-haiku',
+    credentials: { anthropicApiKey: process.env.ANTHROPIC_API_KEY },
+    messages: (chunk) => [
+      { role: 'system', content: 'エンティティをJSONとして抽出。' },
+      { role: 'user', content: chunk }
+    ],
+    transform: (response) => JSON.parse(response.text)
+  })
+  .run(document);
+```
+
+## 💡 実例
+
+### 📚 500ページの研究論文を要約
+
+```typescript
+const paper = readFileSync('quantum-computing-thesis.pdf', 'utf-8');
+// 200,000文字以上 - 直接LLM呼び出しは失敗
+
+const summary = await fractop()
+  .withLLM({
+    model: 'groq:llama-3.1-70b',
+    credentials: { groqApiKey: process.env.GROQ_API_KEY },
+    messages: (chunk) => [
+      { role: 'system', content: '重要な発見を要約。簡潔に。' },
+      { role: 'user', content: chunk }
+    ]
+  })
+  .chunking({ size: 3000, overlap: 300 })
+  .parallel(5)  // 5チャンクを同時処理
+  .run(paper);
+
+// 要約を最終文書にマージ
+const finalSummary = summary.join('\n\n');
+```
+
+### 🔍 1000以上のファイルのコードベース解析
+
+```typescript
+const files = globSync('src/**/*.ts');  // 1000以上のTypeScriptファイル
+const fullCode = files.map(f => readFileSync(f)).join('\n');
+// 数百万文字 - 単一LLM呼び出しは不可能
+
+// 全APIエンドポイントを抽出
+const endpoints = await fractop()
+  .withLLM({
+    model: 'anthropic:claude-3-5-haiku',
+    credentials: { anthropicApiKey: API_KEY },
+    messages: (chunk) => [
+      { role: 'system', content: 'REST APIエンドポイントをJSONとして抽出。' },
+      { role: 'user', content: chunk }
+    ],
+    transform: (res) => JSON.parse(res.text)
+  })
+  .chunking({ size: 4000, overlap: 500 })  // オーバーラップでエンドポイント見逃しを防ぐ
+  .parallel(10)  // 10ファイル同時解析
+  .run(fullCode);
+
+// 結果の重複排除
+const uniqueEndpoints = [...new Set(endpoints.flat())];
+console.log(`${uniqueEndpoints.length}個のAPIエンドポイントを発見`);
+```
+
+### 🌐 本まるごと翻訳
+
+```typescript
+const book = await fetch('https://gutenberg.org/files/2600/2600-0.txt')
+  .then(r => r.text());  // 戦争と平和 - 320万文字！
+
+const translatedBook = await fractop()
+  .withLLM({
+    model: 'gemini:gemini-2.5-pro',
+    credentials: { geminiApiKey: process.env.GEMINI_API_KEY },
+    messages: (chunk) => [
+      { role: 'system', content: '日本語に翻訳。文学的スタイルを維持。' },
+      { role: 'user', content: chunk }
+    ]
+  })
+  .chunking({ 
+    size: 2000,      // 品質のため小さめのチャンク
+    overlap: 200     // 文の流れを保持
+  })
+  .retry(3, 2000)    // 失敗チャンクをリトライ
+  .timeout(120000)   // チャンクあたり2分のタイムアウト
+  .run(book);
+
+writeFileSync('戦争と平和.txt', translatedBook.join(''));
+```
+
+### 📊 5万件のカスタマーレビュー処理
+
+```typescript
+// データベースから5万件のサポートチケット
+const tickets = await db.query('SELECT * FROM tickets LIMIT 50000');
+const ticketTexts = tickets.map(t => t.content);
+
+// ストリーミングでバッチ処理
+const analysis = await fractopBatch(ticketTexts)
+  .withLLM({
+    model: 'groq:llama-3.1-8b-instant',  // 高ボリューム用の高速モデル
+    credentials: { groqApiKey: API_KEY },
+    messages: (ticket) => [
+      { role: 'system', content: '出力: 感情|カテゴリ|優先度' },
+      { role: 'user', content: ticket }
+    ],
+    transform: (res) => {
+      const [sentiment, category, priority] = res.text.split('|');
+      return { sentiment, category, priority };
+    }
+  })
+  .collectAll();
+
+// インサイトを集計
+const insights = {
+  sentiments: { positive: 0, negative: 0, neutral: 0 },
+  categories: new Map(),
+  highPriority: []
 };
 
-// プロセッサを作成
-const processor = new FractalProcessor<{ keyword: string; weight: number }>(llm, {
-  chunkSize: 6000,       // チャンクあたりの文字数（トークン制限に対してより安全なデフォルト）
-  overlapSize: 500,      // チャンク間のオーバーラップ
-  minResultCount: 30,    // 最小結果数の閾値
-  parallelProcessing: false,  // 並列処理を有効にする
-  concurrency: 3,        // 並列モードでの最大同時チャンク数
-});
-
-// 長文テキストを処理
-const keywords = await processor.process(longText, {
-  generateContext: async (text) => {
-    // ドキュメントサマリーを生成
-    return await llm.chat(
-      'Summarizer',
-      `この文書を3文で要約してください:\n\n${text.substring(0, 8000)}`,
-      { temperature: 0.3 }
-    );
-  },
-
-  processChunk: async (chunk, context) => {
-    // このチャンクからキーワードを抽出
-    const response = await llm.chat(
-      'Keyword Extractor',
-      `コンテキスト: ${context.globalContext}\n\n` +
-      `以下からキーワードを抽出:\n${chunk}`,
-      { temperature: 0.2 }
-    );
-    return { items: parseKeywords(response) };
-  },
-
-  mergeResults: (results) => simpleMerge(results, 30),
-  getKey: (item) => item.keyword,
-});
-```
-
-## アーキテクチャ
-
-FractoPは、LLMのコンテキスト制限を超えるドキュメントを処理するためにフラクタルアーキテクチャを使用します：
-
-1. **グローバルコンテキスト生成**: ドキュメント全体のサマリーを作成
-2. **インテリジェントチャンキング**: 自然な境界でオーバーラップ付きで分割
-3. **逐次処理**: コンテキスト伝播を使用して各チャンクを処理
-4. **結果のマージ**: すべてのチャンクからの結果を結合・重複排除
-5. **補足処理**: 最小閾値以下の場合に追加結果を追加
-
-### 処理フロー
-
-```
-入力テキスト
-    ↓
-グローバルコンテキスト生成
-    ↓
-チャンクに分割（オーバーラップあり）
-    ↓
-各チャンクを処理（コンテキスト付き）
-    ↓
-結果をマージ＆重複排除
-    ↓
-必要に応じて補足
-    ↓
-最終結果
-```
-
-## 設定
-
-### FractalConfigオプション
-
-```typescript
-interface FractalConfig {
-  chunkSize?: number;        // デフォルト: 6000（トークン制限に対してより安全）
-  overlapSize?: number;      // デフォルト: 500
-  minResultCount?: number;   // デフォルト: 30
-  supplementCount?: number;  // デフォルト: 50
-  parallelProcessing?: boolean;  // デフォルト: false
-  concurrency?: number;      // デフォルト: 3
-  enableStreaming?: boolean; // デフォルト: false
-  timeout?: number;          // 全体のタイムアウト（ミリ秒）
-  chunkTimeout?: number;     // チャンクごとのタイムアウト（ミリ秒）
-  maxRetries?: number;       // デフォルト: 3
-  retryDelay?: number;       // 初期リトライ遅延（ミリ秒）
-  circuitBreakerThreshold?: number;  // デフォルト: 3
-}
-```
-
-### マージ関数
-
-#### simpleMerge<T>(results, minCount)
-
-すべての結果をフラット化し、minCount未満の場合は補足フラグを立てます。
-
-```typescript
-const merged = simpleMerge(results, 30);
-```
-
-#### weightedMerge<T>(results, getKey, minCount)
-
-複数のチャンクに出現するアイテムの重みを集計します。
-
-```typescript
-const merged = weightedMerge(
-  results,
-  (item) => item.keyword,
-  30
-);
-```
-
-## 高度な機能
-
-### 並列処理
-
-より良いパフォーマンスのためにチャンクを並列処理（注：このモードではコンテキスト伝播は無効）：
-
-```typescript
-const processor = new FractalProcessor(llm, {
-  parallelProcessing: true,
-  concurrency: 5,  // 最大5チャンクを同時に処理
-});
-
-// コンテキスト伝播を必要としないタスクに使用
-const keywords = await processor.process(text, options);
-```
-
-### NagareによるストリーミングAPI
-
-大規模ドキュメントのメモリ効率的な処理のためにストリーム結果：
-
-```typescript
-// 非同期イテレータを使用
-for await (const item of processor.processStream(text, options)) {
-  console.log('受信したアイテム:', item);
-  // 到着したアイテムを処理
-}
-
-// Nagare Stream<T>を使用
-const stream: Stream<T> = processor.processAsStream(text, options);
-stream
-  .filter(item => item.weight > 0.5)
-  .map(item => item.keyword)
-  .subscribe({
-    next: keyword => console.log('高重みキーワード:', keyword),
-    complete: () => console.log('ストリーム完了')
+for (const [ticket, results] of analysis) {
+  results.forEach(r => {
+    insights.sentiments[r.sentiment]++;
+    if (r.priority === 'high') insights.highPriority.push(ticket);
   });
-```
-
-## 信頼性機能
-
-### タイムアウト制御
-
-```typescript
-const processor = new FractalProcessor(llm, {
-  timeout: 300000,        // 全体で5分
-  chunkTimeout: 60000,    // チャンクあたり1分
-});
-```
-
-### 指数バックオフ付き自動リトライ
-
-```typescript
-const processor = new FractalProcessor(llm, {
-  maxRetries: 3,          // 最大3回リトライ
-  retryDelay: 1000,       // 1秒から開始、次は2秒、4秒...
-});
-```
-
-### サーキットブレーカーパターン
-
-```typescript
-const processor = new FractalProcessor(llm, {
-  circuitBreakerThreshold: 3,  // 3回連続失敗後にブレーク
-});
-
-const result = await processor.processWithMetadata(text, options);
-if (result.circuitBreakerTripped) {
-  console.error('繰り返しエラーのため処理を停止');
 }
 ```
 
-### 可観測性のためのイベントシステム
+### 🤖 大規模コンポーネントのテスト生成
 
 ```typescript
-processor.on((event) => {
-  switch (event.type) {
-    case 'chunk_start':
-      console.log(`チャンク ${event.index + 1}/${event.total} を処理中`);
-      break;
-    case 'chunk_complete':
-      console.log(`チャンク ${event.index + 1} 完了`);
-      break;
-    case 'chunk_retry':
-      console.warn(`チャンク ${event.index} をリトライ中（試行 ${event.attempt}）`);
-      break;
-    case 'complete':
-      console.log(`処理完了: ${event.totalItems} 件の結果`);
-      break;
-  }
+const component = readFileSync('src/Dashboard.tsx', 'utf-8');
+// 5000行のReactコンポーネント
+
+const tests = await fractop()
+  .withLLM({
+    model: 'openai:gpt-4o',
+    credentials: { openaiApiKey: process.env.OPENAI_API_KEY },
+    messages: (chunk) => [
+      { role: 'system', content: 'React Testing LibraryでJestユニットテストを生成。' },
+      { role: 'user', content: chunk }
+    ]
+  })
+  .chunking({ size: 1500 })  // 各チャンクに的を絞ったテスト
+  .parallel(3)
+  .run(component);
+
+// テストスイートに結合
+const testFile = `
+describe('Dashboard Component', () => {
+  ${tests.join('\n\n')}
 });
+`;
+writeFileSync('Dashboard.test.tsx', testFile);
 ```
 
-## LLMProviderインターフェース
+### 💬 リアルタイムドキュメントQ&A
 
 ```typescript
-interface LLMProvider {
-  chat(
-    systemPrompt: string,
-    userPrompt: string,
-    options?: {
-      temperature?: number;
-      maxTokens?: number;
-    }
-  ): Promise<string>;
+async function askDocument(doc: string, question: string) {
+  // ドキュメントをストリーミングして答えを探す
+  return await fractopStream(doc)
+    .withLLM({
+      model: 'gemini:gemini-2.5-flash',  // リアルタイム用の高速モデル
+      credentials: { geminiApiKey: API_KEY },
+      messages: (chunk) => [
+        { role: 'user', content: `「${question}」に答えて: ${chunk}` }
+      ]
+    })
+    .chunking({ size: 3000, overlap: 500 })
+    .stream()
+    .filter(answer => answer.length > 20)  // 関連する答えをフィルタ
+    .take(3)  // 最初の3つの良い答え
+    .collect();
+}
+
+// 使用例
+const manual = readFileSync('kubernetes-manual.txt', 'utf-8');
+const answers = await askDocument(manual, "オートスケーリングの設定方法は？");
+// 数分ではなく数秒で返答！
+```
+
+## 🌊 Nagareでストリーミング
+
+メモリ効率的なストリーミングで大規模ドキュメントを処理：
+
+```typescript
+import { fractopStream } from '@aid-on/fractop';
+
+// 処理されるごとに結果をストリーム
+const stream = fractopStream(largeDocument)
+  .withLLM(async (chunk) => await processChunk(chunk))
+  .chunking({ size: 2000, overlap: 200 })
+  .parallel(3)
+  .stream();
+
+// リアクティブストリーム操作
+await stream
+  .map(result => result.toUpperCase())
+  .filter(result => result.length > 100)
+  .take(10)
+  .collect();
+```
+
+## ⚙️ 設定
+
+### デフォルト設定
+
+```typescript
+{
+  chunkSize: 3000,        // LLMトークン制限に最適化
+  overlapSize: 300,       // コンテキスト保持
+  concurrency: 3,         // 並列処理スレッド
+  maxRetries: 2,          // リトライ試行回数
+  retryDelay: 1000,       // 初期リトライ遅延（ミリ秒）
+  chunkTimeout: 30000     // チャンクごとのタイムアウト（ミリ秒）
 }
 ```
 
-以下と互換性あり：
-- OpenAI GPT
-- Anthropic Claude
-- Google Gemini
-- Cloudflare Workers AI
-- チャット補完APIを持つ任意のLLM
+## 📦 API リファレンス
 
-## ユースケース
+### Fluent APIメソッド
 
-- **用語抽出**: ドキュメントから技術用語を抽出して定義
-- **キーワード分析**: 検索/タグ付けのための重み付きキーワード抽出
-- **ドキュメント構造化**: ピラー/トピックを抽出してセクションを割り当て
-- **翻訳**: 長いドキュメントをチャンクごとに翻訳
-- **要約**: マルチレベル要約の生成
+| メソッド | 説明 |
+|--------|-------------|
+| `.withLLM(fn\|config)` | LLMプロセッサを設定（関数またはUnillM設定） |
+| `.chunking(opts)` | チャンクサイズとオーバーラップを設定 |
+| `.parallel(n)` | 並列処理を有効化 |
+| `.retry(n, delay)` | リトライ動作を設定 |
+| `.timeout(ms, perChunk?)` | タイムアウト制限を設定 |
+| `.run(text)` | 処理を実行 |
 
-## TypeScriptサポート
+## 🚀 パフォーマンスのヒント
 
-FractoPはTypeScriptで書かれており、完全な型安全性を提供します：
-
-```typescript
-// アイテムタイプを定義
-interface ExtractedItem {
-  term: string;
-  definition: string;
-  confidence: number;
-}
-
-// 型付きプロセッサを作成
-const processor = new FractalProcessor<ExtractedItem>(llm, config);
-
-// 型安全なオプションで処理
-const results = await processor.process<ExtractedItem>(text, {
-  processChunk: async (chunk, context) => {
-    // 戻り値の型が強制される
-    return {
-      items: extractedItems,
-      summary: '正常に処理されました'
-    };
-  },
-  getKey: (item) => item.term,  // 型安全なプロパティアクセス
-});
-```
-
-## パフォーマンスの考慮事項
-
-- **チャンクサイズ**: 大きなチャンクはより多くのトークンを使用するが、コンテキストをより良く維持
-- **オーバーラップサイズ**: より多くのオーバーラップはコンテキストを保持するが、処理が増加
-- **並列処理**: チャンクはコンテキストフローを維持するために逐次処理される
-- **キャッシング**: 繰り返し処理のためのLLMレスポンスキャッシングの実装を検討
+1. **チャンクサイズ**: コンテキストとトークン制限のバランス（2000-4000文字推奨）
+2. **オーバーラップ**: チャンクサイズの10-20%で良好なコンテキスト保持
+3. **並行性**: LLMレート制限に合わせる（ほとんどのプロバイダーで3-5）
+4. **ストリーミング**: 100KB以上のドキュメントには`fractopStream`を使用
+5. **バッチング**: 複数ドキュメントには`fractopBatch`を使用
 
 ## ライセンス
 
