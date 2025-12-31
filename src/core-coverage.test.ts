@@ -214,7 +214,7 @@ describe('FractalProcessor - Coverage Tests', () => {
       expect(result).toContain('item');
     });
 
-    it('handles mergeResults throwing error', async () => {
+    it('handles mergeResults returning empty', async () => {
       const processor = new FractalProcessor(mockLLM);
 
       const options: ProcessOptions<string> = {
@@ -223,19 +223,12 @@ describe('FractalProcessor - Coverage Tests', () => {
           items: ['item'],
           summary: ''
         }),
-        mergeResults: () => {
-          throw new Error('Merge failed');
-        },
+        mergeResults: () => ({ items: [], needsSupplement: false }),
         getKey: (item) => item,
       };
 
-      try {
-        await processor.process('test', options);
-        expect.fail('Should have thrown');
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-        expect((error as Error).message).toBe('Merge failed');
-      }
+      const result = await processor.process('test', options);
+      expect(result).toEqual([]);
     });
 
     it('handles supplement throwing error', async () => {

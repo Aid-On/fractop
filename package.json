@@ -1,10 +1,19 @@
 {
   "name": "@aid-on/fractop",
-  "version": "0.5.0",
+  "version": "0.6.2",
   "type": "module",
   "description": "FractoP - Fractal Processor for infinite-length text processing with LLMs",
-  "main": "dist/index.js",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "sideEffects": false,
   "files": [
     "dist",
     "README.md",
@@ -20,7 +29,8 @@
   "homepage": "https://github.com/Aid-On/fractop#readme",
   "author": "Aid-On Team",
   "scripts": {
-    "build": "tsc",
+    "build": "tsup",
+    "build:tsc": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -38,11 +48,12 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@aid-on/nagare": "^0.1.0",
-    "@aid-on/unillm": "^0.4.0"
+    "@aid-on/nagare": "^0.2.1",
+    "@aid-on/unillm": "^0.5.1"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^1.6.1",
+    "tsup": "^8.5.1",
     "typescript": "^5.0.0",
     "vitest": "^1.0.0"
   }
