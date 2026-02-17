@@ -5,7 +5,7 @@
  */
 
 import { FractalProcessor } from './core';
-import type { FractalConfig, LLMProvider, MergeResult, ProcessOptions } from './types';
+import type { ChunkContext, FractalConfig, LLMProvider, MergeResult, ProcessOptions, ProcessResult } from './types';
 import { createLLMAdapter } from './llm-adapter';
 import { simpleMerge, weightedMerge } from './core';
 import type { ModelSpec, Credentials } from '@aid-on/unillm';
@@ -42,8 +42,8 @@ export class FractoPBuilder<T = string> {
   private llmProvider?: LLMProvider | ((text: string) => Promise<T>);
   private config: Partial<FractalConfig> = {};
   private processOptions: Partial<ProcessOptions<T>> = {};
-  private contextGenerator?: (text: string) => Promise<any>;
-  private chunkProcessor?: (chunk: string, context: any) => Promise<any>;
+  private contextGenerator?: (text: string) => Promise<string>;
+  private chunkProcessor?: (chunk: string, context: ChunkContext) => Promise<ProcessResult<T>>;
   private resultMerger?: (results: T[][]) => MergeResult<T>;
 
   /**
@@ -81,7 +81,7 @@ export class FractoPBuilder<T = string> {
           unillmConfig.options || {}
         );
         
-        return unillmConfig.transform ? unillmConfig.transform(result) : result.text as any as T;
+        return unillmConfig.transform ? unillmConfig.transform(result) : result.text as unknown as T;
       };
     } else {
       this.llmProvider = provider as LLMProvider | ((text: string) => Promise<T>);
@@ -131,7 +131,7 @@ export class FractoPBuilder<T = string> {
   /**
    * Set context generator for processing
    */
-  context(generator: (text: string) => Promise<any>): this {
+  context(generator: (text: string) => Promise<string>): this {
     this.contextGenerator = generator;
     return this;
   }
@@ -139,7 +139,7 @@ export class FractoPBuilder<T = string> {
   /**
    * Set chunk processor
    */
-  process(processor: (chunk: string, context: any) => Promise<any>): this {
+  process(processor: (chunk: string, context: ChunkContext) => Promise<ProcessResult<T>>): this {
     this.chunkProcessor = processor;
     return this;
   }
@@ -220,7 +220,7 @@ export class FractoPBuilder<T = string> {
         }
         // Otherwise, this must be a full LLMProvider, so we need to process differently
         // The user should provide processChunk if they want custom processing
-        return { items: [chunk as any as T] };
+        return { items: [chunk as unknown as T] };
       }),
       getKey: (item: T) => JSON.stringify(item),
       mergeResults: this.resultMerger || ((results) => ({

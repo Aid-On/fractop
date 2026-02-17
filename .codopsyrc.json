@@ -1,0 +1,32 @@
+{
+  "rules": {
+    "no-any": "info",
+    "no-console": "info",
+    "no-var": "warning",
+    "eqeqeq": "warning",
+    "no-empty-function": "info",
+    "no-nested-ternary": "warning",
+    "no-param-reassign": "warning",
+    "prefer-const": "info",
+    "max-complexity": {
+      "severity": "warning",
+      "max": 10
+    },
+    "max-cognitive-complexity": {
+      "severity": "warning",
+      "max": 15
+    },
+    "max-lines": {
+      "severity": "warning",
+      "max": 300
+    },
+    "max-depth": {
+      "severity": "warning",
+      "max": 4
+    },
+    "max-params": {
+      "severity": "warning",
+      "max": 4
+    }
+  }
+}

@@ -9,22 +9,7 @@ import { FractalProcessor } from './core';
 import type { FractalConfig, LLMProvider } from './types';
 import { fractop } from './fluent';
 
-/**
- * Create a Nagare stream from FractoP processing
- * 
- * @example
- * ```typescript
- * const stream = fractopStream(text)
- *   .withLLM(async (chunk) => await llm.process(chunk))
- *   .chunking({ size: 2000 })
- *   .stream();
- * 
- * await stream
- *   .map(result => result.toUpperCase())
- *   .filter(result => result.length > 100)
- *   .forEach(console.log);
- * ```
- */
+/** Create a Nagare stream from FractoP processing */
 export class FractoPStream<T = string> {
   private text: string;
   private builder = fractop<T>();
@@ -89,36 +74,12 @@ export class FractoPStream<T = string> {
   }
 }
 
-/**
- * Create a stream-based FractoP processor
- * 
- * @example
- * ```typescript
- * const results = await fractopStream(longText)
- *   .withLLM(myLLM)
- *   .chunking({ size: 2000 })
- *   .collect();
- * ```
- */
+/** Create a stream-based FractoP processor */
 export function fractopStream<T = string>(text: string): FractoPStream<T> {
   return new FractoPStream<T>(text);
 }
 
-/**
- * Process multiple texts as a stream
- * 
- * @example
- * ```typescript
- * const texts = ['text1', 'text2', 'text3'];
- * 
- * await fractopBatch(texts)
- *   .withLLM(myLLM)
- *   .chunking({ size: 2000 })
- *   .stream()
- *   .map(result => ({ ...result, processed: true }))
- *   .forEach(console.log);
- * ```
- */
+/** Process multiple texts as a stream */
 export class FractoPBatch<T = string> {
   private texts: string[];
   private builder = fractop<T>();
@@ -187,24 +148,10 @@ export function fractopBatch<T = string>(texts: string[]): FractoPBatch<T> {
   return new FractoPBatch<T>(texts);
 }
 
-/**
- * Create a reactive pipeline with operators
- * 
- * @example
- * ```typescript
- * const pipeline = createPipeline()
- *   .source(longText)
- *   .chunk(2000, 200)
- *   .process(async (chunk) => await llm.summarize(chunk))
- *   .merge('weighted')
- *   .build();
- * 
- * const result = await pipeline.execute();
- * ```
- */
+/** Create a reactive pipeline with operators */
 export class FractoPPipeline<T = string> {
   private sourceText?: string;
-  private operations: Array<(input: any) => Promise<any>> = [];
+  private operations: Array<(input: unknown) => Promise<unknown>> = [];
 
   /**
    * Set the source text
@@ -218,16 +165,16 @@ export class FractoPPipeline<T = string> {
    * Add chunking operation
    */
   chunk(size: number, overlap?: number): this {
-    this.operations.push(async (text: string) => {
-      // Manual chunking implementation
+    this.operations.push(async (input: unknown) => {
+      const text = input as string;
       const chunks: string[] = [];
       const overlapSize = overlap || 0;
-      
+
       for (let i = 0; i < text.length; i += (size - overlapSize)) {
         chunks.push(text.substring(i, i + size));
         if (i + size >= text.length) break;
       }
-      
+
       return chunks;
     });
     return this;
@@ -236,19 +183,21 @@ export class FractoPPipeline<T = string> {
   /**
    * Add processing operation
    */
-  process<R>(fn: (chunk: any) => Promise<R>): FractoPPipeline<R> {
-    this.operations.push(async (chunks: any[]) => {
+  process<R>(fn: (chunk: unknown) => Promise<R>): FractoPPipeline<R> {
+    this.operations.push(async (input: unknown) => {
+      const chunks = input as unknown[];
       const results = await Promise.all(chunks.map(fn));
       return results;
     });
-    return this as any;
+    return this as unknown as FractoPPipeline<R>;
   }
 
   /**
    * Add merge operation
    */
   merge(strategy: 'simple' | 'weighted' | ((results: T[]) => T)): this {
-    this.operations.push(async (results: T[][]) => {
+    this.operations.push(async (input: unknown) => {
+      const results = input as T[][];
       if (strategy === 'simple') {
         return results.flat();
       } else if (strategy === 'weighted') {
@@ -276,13 +225,13 @@ export class FractoPPipeline<T = string> {
       throw new Error('Source text is required');
     }
 
-    let result: any = this.sourceText;
-    
+    let result: unknown = this.sourceText;
+
     for (const operation of this.operations) {
       result = await operation(result);
     }
-    
-    return result;
+
+    return result as T;
   }
 
   /**

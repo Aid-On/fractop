@@ -60,7 +60,7 @@ export function createLLMAdapter<T = string>(
  */
 export function createUnillMAdapter(
   model: string,
-  credentials: Record<string, any>
+  credentials: Record<string, unknown>
 ): LLMProvider {
   return {
     async chat(systemPrompt: string, userPrompt: string, options?: {

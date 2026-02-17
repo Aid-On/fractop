@@ -5,7 +5,7 @@
  */
 
 import { FractalProcessor } from './core';
-import type { FractalConfig, LLMProvider, MergeResult, ProcessOptions } from './types';
+import type { FractalConfig, ChunkContext, LLMProvider, MergeResult, ProcessOptions } from './types';
 
 /**
  * Create a FractalProcessor configured for use with UnillM
@@ -69,9 +69,9 @@ export function createWithUnillM<T = string>(
  * });
  * ```
  */
-export function createUnillMProcessor<T = any>(config: {
-  processChunk: (chunk: string, context?: any) => Promise<T>;
-  generateContext?: (text: string) => Promise<any>;
+export function createUnillMProcessor<T = unknown>(config: {
+  processChunk: (chunk: string, context?: unknown) => Promise<T>;
+  generateContext?: (text: string) => Promise<string>;
   mergeResults?: (results: T[][]) => MergeResult<T>;
   fractalConfig?: FractalConfig;
 }) {
@@ -96,9 +96,9 @@ export function createUnillMProcessor<T = any>(config: {
     processor,
     async processWithMetadata(text: string) {
       const options: ProcessOptions<T> = {
-        generateContext: config.generateContext || (async () => ({ length: text.length })),
-        processChunk: async (chunk: string, context: any) => {
-          const result = await config.processChunk(chunk, context);
+        generateContext: config.generateContext || (async () => ''),
+        processChunk: async (chunk: string, _context: ChunkContext) => {
+          const result = await config.processChunk(chunk);
           return {
             items: [result],
             metadata: { chunkLength: chunk.length }
