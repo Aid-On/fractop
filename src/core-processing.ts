@@ -30,9 +30,11 @@ export interface ResolvedConfig {
 
 /** Timeout error class */
 export class TimeoutError extends Error {
-  constructor(message: string, public phase: 'overall' | 'chunk') {
+  public phase: 'overall' | 'chunk';
+  constructor(message: string, phase: 'overall' | 'chunk') {
     super(message);
     this.name = 'TimeoutError';
+    this.phase = phase;
   }
 }
 
@@ -98,7 +100,7 @@ export async function withRetry<R>(
     }
   }
 
-  throw lastError!;
+  throw lastError ?? new Error('withRetry failed with no recorded error');
 }
 
 /** Parameters for chunk handling */
@@ -164,12 +166,13 @@ function findBestBreak(
   for (const pattern of boundaries) {
     let lastMatch = -1;
     pattern.lastIndex = 0;
-    let match;
-    while ((match = pattern.exec(searchText)) !== null) {
+    let match = pattern.exec(searchText);
+    while (match !== null) {
       const absPos = searchStart + match.index + match[0].length;
       if (absPos <= end + 200 && absPos > start) {
         lastMatch = absPos;
       }
+      match = pattern.exec(searchText);
     }
     if (lastMatch > 0) return lastMatch;
   }

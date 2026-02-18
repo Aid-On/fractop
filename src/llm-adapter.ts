@@ -22,12 +22,12 @@ export function createLLMAdapter<T = string>(
   processChunk: (chunk: string) => Promise<T>
 ): LLMProvider {
   return {
-    async chat(systemPrompt: string, userPrompt: string, options?: {
+    async chat(systemPrompt: string, userPrompt: string, _options?: {
       temperature?: number;
       maxTokens?: number;
     }): Promise<string> {
       // Combine system and user prompts for simple processors
-      const fullPrompt = systemPrompt 
+      const fullPrompt = systemPrompt
         ? `${systemPrompt}\n\n${userPrompt}`
         : userPrompt;
       
@@ -59,11 +59,11 @@ export function createLLMAdapter<T = string>(
  * ```
  */
 export function createUnillMAdapter(
-  model: string,
-  credentials: Record<string, unknown>
+  _model: string,
+  _credentials: Record<string, unknown>
 ): LLMProvider {
   return {
-    async chat(systemPrompt: string, userPrompt: string, options?: {
+    async chat(systemPrompt: string, userPrompt: string, _options?: {
       temperature?: number;
       maxTokens?: number;
     }): Promise<string> {

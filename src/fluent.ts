@@ -7,7 +7,7 @@
 import { FractalProcessor } from './core';
 import type { ChunkContext, FractalConfig, LLMProvider, MergeResult, ProcessOptions, ProcessResult } from './types';
 import { createLLMAdapter } from './llm-adapter';
-import { simpleMerge, weightedMerge } from './core';
+import { simpleMerge } from './core';
 import type { ModelSpec, Credentials } from '@aid-on/unillm';
 import { generate } from '@aid-on/unillm';
 
@@ -212,7 +212,7 @@ export class FractoPBuilder<T = string> {
     // Always use processWithMetadata with proper options
     const options: ProcessOptions<T> = {
       generateContext: this.contextGenerator || (async () => ''),
-      processChunk: this.chunkProcessor || (async (chunk, context) => {
+      processChunk: this.chunkProcessor || (async (chunk, _context) => {
         // If we have a function LLM, call it directly
         if (llmFunction) {
           const result = await llmFunction(chunk);

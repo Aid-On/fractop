@@ -28,28 +28,35 @@ import {
 export { TimeoutError, CircuitBreakerError } from './core-processing';
 export type { ResolvedConfig } from './core-processing';
 
+/** Resolve a partial FractalConfig into a full ResolvedConfig with defaults */
+function resolveConfig(config: FractalConfig): ResolvedConfig {
+  return {
+    chunkSize: config.chunkSize ?? 6000,
+    overlapSize: config.overlapSize ?? 500,
+    minResultCount: config.minResultCount ?? 30,
+    supplementCount: config.supplementCount ?? 50,
+    parallelProcessing: config.parallelProcessing ?? false,
+    concurrency: config.concurrency ?? 3,
+    enableStreaming: config.enableStreaming ?? false,
+    timeout: config.timeout,
+    chunkTimeout: config.chunkTimeout ?? 60000,
+    maxRetries: config.maxRetries ?? 3,
+    retryDelay: config.retryDelay ?? 1000,
+    circuitBreakerThreshold: config.circuitBreakerThreshold ?? 3,
+  };
+}
+
 export class FractalProcessor<T> {
   private config: ResolvedConfig;
   private listeners: FractalEventListener<T>[] = [];
+  private llm: LLMProvider;
 
   constructor(
-    private llm: LLMProvider,
+    llm: LLMProvider,
     config: FractalConfig = {}
   ) {
-    this.config = {
-      chunkSize: config.chunkSize ?? 6000,
-      overlapSize: config.overlapSize ?? 500,
-      minResultCount: config.minResultCount ?? 30,
-      supplementCount: config.supplementCount ?? 50,
-      parallelProcessing: config.parallelProcessing ?? false,
-      concurrency: config.concurrency ?? 3,
-      enableStreaming: config.enableStreaming ?? false,
-      timeout: config.timeout,
-      chunkTimeout: config.chunkTimeout ?? 60000,
-      maxRetries: config.maxRetries ?? 3,
-      retryDelay: config.retryDelay ?? 1000,
-      circuitBreakerThreshold: config.circuitBreakerThreshold ?? 3,
-    };
+    this.llm = llm;
+    this.config = resolveConfig(config);
   }
 
   /** Add an event listener */

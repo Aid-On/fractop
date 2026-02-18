@@ -35,13 +35,13 @@ export function createWithUnillM<T = string>(
 ): FractalProcessor<T> {
   // Create an LLMProvider wrapper
   const provider: LLMProvider = {
-    async chat(systemPrompt: string, userPrompt: string): Promise<string> {
+    async chat(_systemPrompt: string, userPrompt: string): Promise<string> {
       // For simple processors, just pass the user prompt
       const result = await llmProcessor(userPrompt);
       return String(result);
     }
   };
-  
+
   // Optimized defaults for LLM processing
   const llmOptimizedConfig: FractalConfig = {
     chunkSize: 3000,         // Safe for most LLMs
@@ -77,7 +77,7 @@ export function createUnillMProcessor<T = unknown>(config: {
 }) {
   // Create LLMProvider from processChunk
   const provider: LLMProvider = {
-    async chat(systemPrompt: string, userPrompt: string): Promise<string> {
+    async chat(_systemPrompt: string, userPrompt: string): Promise<string> {
       const result = await config.processChunk(userPrompt);
       return String(result);
     }

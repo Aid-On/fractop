@@ -5,8 +5,7 @@
  */
 
 import { stream as nagareStream, type Stream } from '@aid-on/nagare';
-import { FractalProcessor } from './core';
-import type { FractalConfig, LLMProvider } from './types';
+import type { LLMProvider } from './types';
 import { fractop } from './fluent';
 
 /** Create a Nagare stream from FractoP processing */
@@ -46,8 +45,8 @@ export class FractoPStream<T = string> {
    * Create a Nagare stream
    */
   stream(): Stream<T> {
-    const processor = this.builder.build();
-    
+    const _processor = this.builder.build();
+
     // Create stream from async generator
     return nagareStream.create<T>((controller) => {
       (async () => {
@@ -108,8 +107,8 @@ export class FractoPBatch<T = string> {
    * Create a stream of results
    */
   stream(): Stream<{ text: string; result: T[] }> {
-    const processor = this.builder.build();
-    
+    const _processor = this.builder.build();
+
     return nagareStream.create<{ text: string; result: T[] }>((controller) => {
       (async () => {
         try {
