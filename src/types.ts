@@ -110,6 +110,7 @@ export interface TermDefinition {
   term: string;
   reading?: string;
   definition: string;
+  score?: number;
 }
 
 /**
