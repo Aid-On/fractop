@@ -25,6 +25,7 @@ export interface ResolvedConfig {
   chunkTimeout: number;
   maxRetries: number;
   retryDelay: number;
+  maxRetryDelay: number;
   circuitBreakerThreshold: number;
 }
 
@@ -94,7 +95,8 @@ export async function withRetry<R>(
       emit({ type: 'chunk_retry', index: chunkIndex, attempt: attempt + 1, error: lastError });
 
       if (attempt < config.maxRetries - 1) {
-        const delay = config.retryDelay * Math.pow(2, attempt);
+        // 指数バックオフに上限を設ける（待機だけでデッドラインを食わないため）
+        const delay = Math.min(config.retryDelay * Math.pow(2, attempt), config.maxRetryDelay);
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
@@ -139,22 +141,6 @@ export async function processChunkWithHandling<T>(
     emit({ type: 'chunk_failed', index, error: toError(error), skipped: true });
     return null;
   }
-}
-
-/** Process promises in batches with concurrency limit */
-export async function processInBatches<R>(
-  promises: Promise<R>[],
-  batchSize: number
-): Promise<PromiseSettledResult<R>[]> {
-  const results: PromiseSettledResult<R>[] = [];
-
-  for (let i = 0; i < promises.length; i += batchSize) {
-    const batch = promises.slice(i, i + batchSize);
-    const batchResults = await Promise.allSettled(batch);
-    results.push(...batchResults);
-  }
-
-  return results;
 }
 
 /** Find the best break position using boundary patterns */

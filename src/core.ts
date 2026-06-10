@@ -42,6 +42,7 @@ function resolveConfig(config: FractalConfig): ResolvedConfig {
     chunkTimeout: config.chunkTimeout ?? 60000,
     maxRetries: config.maxRetries ?? 3,
     retryDelay: config.retryDelay ?? 1000,
+    maxRetryDelay: config.maxRetryDelay ?? 8000,
     circuitBreakerThreshold: config.circuitBreakerThreshold ?? 3,
   };
 }

@@ -4,7 +4,6 @@ import type { ResolvedConfig } from './core-processing';
 import {
   toError,
   processChunkWithHandling,
-  processInBatches,
   deduplicateItems,
 } from './core-processing';
 
@@ -37,43 +36,67 @@ export interface MergeParams<T> {
   emit: (event: FractalEvent<T>) => void;
 }
 
-/** Process chunks in parallel */
+/**
+ * Process chunks in parallel with a bounded worker pool.
+ *
+ * 旧実装は `chunks.map(async …)` で全チャンクを即座に起動しており、
+ * concurrency はバッチ待機の粒度でしかなかった（実同時実行数 = チャンク数 →
+ * 50 チャンクで LLM 50 連射、レート制限を直撃）。現実装は **concurrency 本の
+ * ワーカーが共有インデックスから連続的に仕事を取る**ため、同時実行数は常に
+ * concurrency 以下で、wave 方式のような「遅いチャンクがバッチを堰き止める」
+ * 待ちも生じない。直列モード同様に overall timeout と circuit breaker を尊重する
+ * （並列での「連続失敗」は完了順で数える近似）。結果はチャンク順を保つ。
+ */
 export async function processChunksParallel<T>(
   params: ChunkProcessingParams<T>
 ): Promise<ChunkProcessingResult<T>> {
   const { chunks, globalContext, options, config, emit, startTime } = params;
-  const allResults: T[][] = [];
+  const itemsByIndex: (T[] | null)[] = new Array(chunks.length).fill(null);
+  let nextIndex = 0;
   let chunksProcessed = 0;
   let chunksFailed = 0;
+  let consecutiveFailures = 0;
+  let circuitBreakerTripped = false;
+  let timedOut = false;
 
-  const chunkPromises = chunks.map(async (chunk, i) => {
-    if (config.timeout && Date.now() - startTime > config.timeout) {
-      emit({ type: 'timeout', phase: 'overall', elapsed: Date.now() - startTime });
-      return null;
-    }
-    return processChunkWithHandling({
-      chunk, index: i, total: chunks.length, globalContext,
-      previousSummary: undefined, options, config, emit
-    });
-  });
+  const worker = async (): Promise<void> => {
+    while (true) {
+      if (circuitBreakerTripped || timedOut) return;
+      if (config.timeout && Date.now() - startTime > config.timeout) {
+        if (!timedOut) {
+          timedOut = true;
+          emit({ type: 'timeout', phase: 'overall', elapsed: Date.now() - startTime });
+        }
+        return;
+      }
+      const i = nextIndex++;
+      if (i >= chunks.length) return;
 
-  const results = await processInBatches(chunkPromises, config.concurrency);
-  for (const result of results) {
-    if (result.status === 'fulfilled' && result.value) {
-      allResults.push(result.value.items);
-      chunksProcessed++;
-    } else if (result.status === 'rejected') {
-      chunksFailed++;
-      emit({
-        type: 'chunk_failed',
-        index: results.indexOf(result),
-        error: toError(result.reason),
-        skipped: false
+      const result = await processChunkWithHandling({
+        chunk: chunks[i], index: i, total: chunks.length, globalContext,
+        previousSummary: undefined, options, config, emit
       });
-    }
-  }
 
-  return { allResults, chunksProcessed, chunksFailed, circuitBreakerTripped: false };
+      if (result) {
+        itemsByIndex[i] = result.items;
+        chunksProcessed++;
+        consecutiveFailures = 0;
+      } else {
+        chunksFailed++;
+        consecutiveFailures++;
+        if (consecutiveFailures >= config.circuitBreakerThreshold && !circuitBreakerTripped) {
+          circuitBreakerTripped = true;
+          emit({ type: 'circuit_breaker_open', consecutiveFailures });
+        }
+      }
+    }
+  };
+
+  const poolSize = Math.max(1, Math.min(config.concurrency, chunks.length));
+  await Promise.all(Array.from({ length: poolSize }, () => worker()));
+
+  const allResults = itemsByIndex.filter((r): r is T[] => r !== null);
+  return { allResults, chunksProcessed, chunksFailed, circuitBreakerTripped };
 }
 
 /** Process chunks sequentially with context propagation */

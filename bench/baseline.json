@@ -1,0 +1,62 @@
+[
+  {
+    "name": "sequential",
+    "chunks": 54,
+    "wallMs": 43169,
+    "maxInFlight": 1,
+    "llmCalls": 55,
+    "retries": 0,
+    "retryWaitMs": 0,
+    "items": 381,
+    "chunksFailed": 0,
+    "breaker": false
+  },
+  {
+    "name": "parallel c=3",
+    "chunks": 54,
+    "wallMs": 1817,
+    "maxInFlight": 54,
+    "llmCalls": 55,
+    "retries": 0,
+    "retryWaitMs": 0,
+    "items": 381,
+    "chunksFailed": 0,
+    "breaker": false
+  },
+  {
+    "name": "parallel c=6",
+    "chunks": 54,
+    "wallMs": 1817,
+    "maxInFlight": 54,
+    "llmCalls": 55,
+    "retries": 0,
+    "retryWaitMs": 0,
+    "items": 381,
+    "chunksFailed": 0,
+    "breaker": false
+  },
+  {
+    "name": "flaky seq",
+    "chunks": 54,
+    "wallMs": 50539,
+    "maxInFlight": 1,
+    "llmCalls": 59,
+    "retries": 4,
+    "retryWaitMs": 4000,
+    "items": 381,
+    "chunksFailed": 0,
+    "breaker": false
+  },
+  {
+    "name": "flaky par c=3",
+    "chunks": 54,
+    "wallMs": 3775,
+    "maxInFlight": 54,
+    "llmCalls": 59,
+    "retries": 4,
+    "retryWaitMs": 4000,
+    "items": 381,
+    "chunksFailed": 0,
+    "breaker": false
+  }
+]

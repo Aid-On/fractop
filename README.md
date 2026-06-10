@@ -42,7 +42,7 @@ const summary = await fractop()
 - **🎯 Fluent API**: Elegant chainable interface for building processing pipelines
 - **🌊 Nagare Streaming**: Reactive stream processing with `Stream<T>` integration
 - **🔄 Smart Chunking**: Intelligent text splitting with overlap for context preservation
-- **⚡ Parallel Processing**: Concurrent chunk processing for maximum performance
+- **⚡ Parallel Processing**: Bounded worker-pool chunk processing — in-flight LLM calls never exceed `concurrency` (verified by `npm run benchmark`)
 - **🛡️ Enterprise Reliability**: Timeouts, retries, and circuit breaker patterns built-in
 - **🎨 UnillM Integration**: Works seamlessly with any LLM through UnillM adapters
 - **📦 Batch Processing**: Process multiple documents efficiently
@@ -592,6 +592,19 @@ const results = await fractop<Analysis>()
 3. **Concurrency**: Match your LLM rate limits (3-5 for most providers)
 4. **Streaming**: Use `fractopStream` for documents > 100KB
 5. **Batching**: Use `fractopBatch` for multiple documents
+6. **Retry Backoff**: `maxRetryDelay` (default 8000ms) caps the exponential backoff — tune it down on hard-deadline runtimes like Cloudflare Workers
+
+## 📊 Benchmark
+
+```bash
+npm run benchmark            # mock-LLM corpus run (wall time, max in-flight, retry waits)
+npm run benchmark -- --save  # update bench/baseline.json
+```
+
+`maxInFlight` in the output verifies the concurrency contract: it must equal the
+configured `concurrency` (a regression here means chunks are being fired unbounded —
+exactly the bug fixed in the worker-pool rewrite, where `concurrency: 3` used to
+launch *all* chunks simultaneously and only await them in batches).
 
 ## License
 

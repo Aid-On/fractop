@@ -47,6 +47,12 @@ export interface FractalConfig {
   maxRetries?: number;
   /** Base delay between retries in milliseconds (default: 1000) */
   retryDelay?: number;
+  /**
+   * Upper bound for the exponential retry backoff in milliseconds (default: 8000).
+   * Cloudflare Workers のようにデッドラインが固いランタイムで、無制限の
+   * 指数バックオフ（retryDelay × 2^attempt）が待機だけで時間を食うのを防ぐ。
+   */
+  maxRetryDelay?: number;
   /** Number of consecutive failures before circuit breaker trips (default: 3) */
   circuitBreakerThreshold?: number;
 }

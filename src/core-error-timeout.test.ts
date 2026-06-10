@@ -111,6 +111,30 @@ describe('FractalProcessor - Retry Mechanism', () => {
     expect(attemptCount).toBe(3);
   });
 
+  it('バックオフは maxRetryDelay で頭打ちになる（既定 8000ms）', async () => {
+    const processor = new FractalProcessor<string>(llm, { chunkSize: 100 });
+    expect(processor.getConfig().maxRetryDelay).toBe(8000);
+
+    // retryDelay=100, cap=100 → 待機 100+100=200ms（上限なしなら 100+200=300ms）
+    const capped = new FractalProcessor<string>(llm, {
+      maxRetries: 3,
+      retryDelay: 100,
+      maxRetryDelay: 100,
+      chunkSize: 100,
+    });
+    const options: ProcessOptions<string> = {
+      generateContext: vi.fn().mockResolvedValue('context'),
+      processChunk: vi.fn().mockRejectedValue(new Error('always fails')),
+      mergeResults: (results) => ({ items: results.flat(), needsSupplement: false }),
+      getKey: (item) => item,
+    };
+    const t0 = Date.now();
+    await capped.process('test', options);
+    const elapsed = Date.now() - t0;
+    expect(elapsed).toBeGreaterThanOrEqual(190);
+    expect(elapsed).toBeLessThan(290); // 上限なし（300ms+）なら超える
+  });
+
   it('emits retry events', async () => {
     const processor = new FractalProcessor<string>(llm, {
       maxRetries: 2,
