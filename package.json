@@ -53,9 +53,16 @@
     "@aid-on/unillm": "^0.5.5"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^1.6.1",
+    "@vitest/coverage-v8": "^4.1.11",
     "tsup": "^8.5.1",
     "typescript": "^5.0.0",
-    "vitest": "^1.0.0"
+    "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "vite@5.4.21": "^6.4.3",
+    "esbuild@0.21.5": "~0.25.0",
+    "tinypool@0.8.4": "^2.1.2",
+    "tinypool@1.1.1": "^2.1.2",
+    "@vitest/mocker@3.2.7": "^4.1.11"
   }
 }
